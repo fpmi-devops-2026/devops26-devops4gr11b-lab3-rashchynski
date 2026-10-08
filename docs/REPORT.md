@@ -73,4 +73,55 @@ TestUser rolled: 4
 
 ---
 
-### Задание 2
+### Задание 2: Настройка сбора метрик и интеграция с Prometheus
+
+### Описание шагов выполнения
+
+#### Созданные файлы проекта (`/task2`):
+
+- `app.py` — Flask-приложение с интеграцией `OTLPSpanExporter` и `OTLPMetricExporter` (экспорт данных по gRPC на `otel-collector:4317`). Описан кастомный счетчик метрики `dice_rolls_total`.
+- `requirements.txt` — добавлены OTLP-экспортеры (`opentelemetry-exporter-otlp`).
+- `Dockerfile` — контейнеризация Flask-сервиса.
+- `otel-collector-config.yml` — конфигурация пайплайнов Collector (прием OTLP gRPC/HTTP, экспорт трассировок в Jaeger и метрик в Prometheus).
+- `prometheus.yml` — конфигурация сбора метрик с эндпоинта `otel-collector:8889`.
+- `docker-compose.yml` — оркестрация 4 сервисов (`web`, `otel-collector`, `jaeger`, `prometheus`).
+
+Запуск полного стека мониторинга:
+
+```
+docker compose up --build -d
+```
+
+Проверка состояния контейнеров:
+
+```
+docker compose ps
+```
+
+```
+NAME                IMAGE                                       STATUS
+flask_metrics_app   task2-web                                   Up 5 seconds
+jaeger              jaegertracing/all-in-one:1.53               Up 5 seconds
+otel-collector      otel/opentelemetry-collector-contrib:0.95.0 Up 5 seconds
+prometheus          prom/prometheus:v2.50.1                     Up 5 seconds
+```
+
+Генерация метрик с помощью HTTP-запросов:
+
+```
+curl "http://localhost:8080/rolldice?player=Nazar"
+# Ответ: Nazar rolled: 1
+
+curl "http://localhost:8080/rolldice?player=Nazar"
+# Ответ: Nazar rolled: 5
+
+curl "http://localhost:8080/rolldice?player=Alex"
+# Ответ: Alex rolled: 1
+```
+
+Результаты проверки в Prometheus UI:
+dice_rolls_total{exported_job="dice-server", instance="otel-collector:8889", job="otel-collector", player="Alex", result="1"}
+
+1dice_rolls_total{exported_job="dice-server", instance="otel-collector:8889", job="otel-collector", player="Nazar", result="1"}
+
+1dice_rolls_total{exported_job="dice-server", instance="otel-collector:8889", job="otel-collector", player="Nazar", result="5"}
