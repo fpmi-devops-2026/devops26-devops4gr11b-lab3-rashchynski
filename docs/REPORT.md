@@ -125,3 +125,64 @@ dice_rolls_total{exported_job="dice-server", instance="otel-collector:8889", job
 1dice_rolls_total{exported_job="dice-server", instance="otel-collector:8889", job="otel-collector", player="Nazar", result="1"}
 
 1dice_rolls_total{exported_job="dice-server", instance="otel-collector:8889", job="otel-collector", player="Nazar", result="5"}
+
+---
+
+## Заданиe 3: Централизованное логирование (Loki/Promtail) и визуализация в Grafana
+
+### Описание шагов выполнения
+
+В третьем задании был развернут полный стек наблюдаемости (Observability Stack), объединяющий все три компонента: **Traces**, **Metrics** и **Logs**.
+
+#### Добавленные сервисы и файлы (`/task3`):
+
+- `loki-config.yml` — конфигурация хранилища и индексатора логов Loki.
+- `promtail-config.yml` — агент сбора логов, подключенный к сокету Docker (`/var/run/docker.sock`) для автоматического сбора stdout/stderr всех запущенных контейнеров.
+- `docker-compose.yml` — единая оркестрация 7 контейнеров: `flask_observability_app`, `otel-collector`, `jaeger`, `prometheus`, `loki`, `promtail`, `grafana`.
+
+Команды терминала и запуск:
+
+```
+docker compose up --build -d
+```
+
+Проверка запущенных сервисов:
+
+```
+docker compose ps
+```
+
+```
+NAME                      IMAGE                                         COMMAND                  SERVICE      CREATED          STATUS         PORTS
+flask_observability_app   task3-web                                     "python app.py"          web      8 seconds ago    Up 7 seconds   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+grafana                   grafana/grafana:10.3.3                        "/run.sh"                grafana      8 seconds ago    Up 7 seconds   0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp
+jaeger                    jaegertracing/all-in-one:1.53                 "/go/bin/all-in-one-…"   jaeger      8 seconds ago    Up 8 seconds   0.0.0.0:16686->16686/tcp, [::]:16686->16686/tcp, 0.0.0.0:61477->4317/tcp, [::]:61477->4317/tcp
+loki                      grafana/loki:2.9.4                            "/usr/bin/loki -conf…"   loki      32 seconds ago   Up 8 seconds   0.0.0.0:3100->3100/tcp, [::]:3100->3100/tcp
+otel-collector            otel/opentelemetry-collector-contrib:0.95.0   "/otelcol-contrib --…"   otel-collector   8 seconds ago    Up 7 seconds   0.0.0.0:4317-4318->4317-4318/tcp, [::]:4317-4318->4317-4318/tcp, 0.0.0.0:8889->8889/tcp, [::]:8889->8889/tcp
+prometheus                prom/prometheus:v2.50.1                       "/bin/prometheus --c…"   prometheus      8 seconds ago    Up 8 seconds   0.0.0.0:9090->9090/tcp, [::]:9090->9090/tcp
+promtail                  grafana/promtail:2.9.4                        "/usr/bin/promtail -…"   promtail      32 seconds ago   Up 8 seconds
+```
+
+```
+nazar@MacBook-Air-Nazar task3 % curl http://localhost:8080/
+Welcome to the Dice Rolling Service! Try /rolldice%
+
+nazar@MacBook-Air-Nazar task3 % curl http://localhost:8080/rolldice
+Anonymous rolled: 3
+
+nazar@MacBook-Air-Nazar task3 % curl "http://localhost:8080/rolldice?player=Nazar"
+Nazar rolled: 4
+```
+
+Настройка и проверка в Grafana UI:
+В Grafana (http://localhost:3000) успешно подключены 3 источника данных:
+
+Prometheus (http://prometheus:9090)
+
+Loki (http://loki:3100)
+
+Jaeger (http://jaeger:16686)
+
+В интерфейсе Explore выполнен LogQL-запрос {container="flask_observability_app"} в Loki, подтверждающий корректное поступление логов приложения.
+
+Все трассировки, метрики и логи объединены в единую систему мониторинга.
